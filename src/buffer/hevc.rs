@@ -486,13 +486,21 @@ impl HevcLongSliceFlags {
     }
 }
 
-/// A wrapper over `VASliceParameterBufferHEVC` FFI type
-pub struct SliceParameterBufferHEVC(Box<bindings::VASliceParameterBufferHEVC>);
+/// A wrapper over an array of the `VASliceParameterBufferHEVC` FFI type. This
+/// allows for passing all slice parameters in a single call if multiple slices
+/// are present in the bitstream.
+pub struct SliceParameterBufferHEVC(Vec<bindings::VASliceParameterBufferHEVC>);
 
 impl SliceParameterBufferHEVC {
     /// Creates the wrapper
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    /// Adds a slice to the wrapper.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn add_slice_parameter(
+        &mut self,
         slice_data_size: u32,
         slice_data_offset: u32,
         slice_data_flag: u32,
@@ -522,10 +530,10 @@ impl SliceParameterBufferHEVC {
         num_entry_point_offsets: u16,
         entry_offset_to_subset_array: u16,
         slice_data_num_emu_prevn_bytes: u16,
-    ) -> Self {
+    ) {
         let long_slice_flags = long_slice_flags.0;
 
-        Self(Box::new(bindings::VASliceParameterBufferHEVC {
+        self.0.push(bindings::VASliceParameterBufferHEVC {
             slice_data_size,
             slice_data_offset,
             slice_data_flag,
@@ -556,7 +564,7 @@ impl SliceParameterBufferHEVC {
             entry_offset_to_subset_array,
             slice_data_num_emu_prevn_bytes,
             va_reserved: Default::default(),
-        }))
+        });
     }
 
     /// Set this slice as the last one after creation. Implementations may only
@@ -566,15 +574,21 @@ impl SliceParameterBufferHEVC {
         // Safe because we know that both fields are valid at all times (just a
         // different view on the data), and we are mutating through the bindgen
         // function, respecting the padding in place.
-        unsafe { self.inner_mut().LongSliceFlags.fields.set_LastSliceOfPic(1) };
+        if let Some(inner) = self.inner_mut().last_mut() {
+            unsafe {
+                inner.LongSliceFlags.fields.set_LastSliceOfPic(1);
+            }
+        } else {
+            log::warn!("No slice to mark as last.");
+        }
     }
 
-    pub(crate) fn inner_mut(&mut self) -> &mut bindings::VASliceParameterBufferHEVC {
+    pub(crate) fn inner_mut(&mut self) -> &mut Vec<bindings::VASliceParameterBufferHEVC> {
         self.0.as_mut()
     }
 
     /// Returns the inner FFI type. Useful for testing purposes.
-    pub fn inner(&self) -> &bindings::VASliceParameterBufferHEVC {
+    pub fn inner(&self) -> &Vec<bindings::VASliceParameterBufferHEVC> {
         self.0.as_ref()
     }
 }

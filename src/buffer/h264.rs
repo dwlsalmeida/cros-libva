@@ -193,13 +193,21 @@ impl PictureParameterBufferH264 {
     }
 }
 
-/// Wrapper over the `VASliceParameterBufferH264` FFI type.
-pub struct SliceParameterBufferH264(Box<bindings::VASliceParameterBufferH264>);
+/// Wrapper over an array of the `VASliceParameterBufferH264` FFI type. This
+/// allows for passing all slice parameters in a single call if multiple slices
+/// are present in the bitstream.
+pub struct SliceParameterBufferH264(Vec<bindings::VASliceParameterBufferH264>);
 
 impl SliceParameterBufferH264 {
-    /// Creates the wrapper
+    /// Creates the wrapper.
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    /// Adds a slice parameter to the wrapper.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn add_slice_parameter(
+        &mut self,
         slice_data_size: u32,
         slice_data_offset: u32,
         slice_data_flag: u32,
@@ -230,11 +238,11 @@ impl SliceParameterBufferH264 {
         chroma_weight_l1_flag: u8,
         chroma_weight_l1: [[i16; 2usize]; 32usize],
         chroma_offset_l1: [[i16; 2usize]; 32usize],
-    ) -> Self {
+    ) {
         let ref_pic_list_0 = ref_pic_list_0.map(|pic| pic.0);
         let ref_pic_list_1 = ref_pic_list_1.map(|pic| pic.0);
 
-        Self(Box::new(bindings::VASliceParameterBufferH264 {
+        self.0.push(bindings::VASliceParameterBufferH264 {
             slice_data_size,
             slice_data_offset,
             slice_data_flag,
@@ -266,15 +274,15 @@ impl SliceParameterBufferH264 {
             chroma_weight_l1,
             chroma_offset_l1,
             va_reserved: Default::default(),
-        }))
+        });
     }
 
-    pub(crate) fn inner_mut(&mut self) -> &mut bindings::VASliceParameterBufferH264 {
+    pub(crate) fn inner_mut(&mut self) -> &mut Vec<bindings::VASliceParameterBufferH264> {
         self.0.as_mut()
     }
 
     /// Returns the inner FFI type. Useful for testing purposes.
-    pub fn inner(&self) -> &bindings::VASliceParameterBufferH264 {
+    pub fn inner(&self) -> &Vec<bindings::VASliceParameterBufferH264> {
         self.0.as_ref()
     }
 }
